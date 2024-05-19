@@ -1,1 +1,189 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <sstream>
 
+class Monomial 
+{
+public:
+    double coefficient;
+    int degree;
+
+    Monomial(double coeff, int deg) : coefficient(coeff), degree(deg) {}
+
+    std::string toString() const 
+    {
+        std::ostringstream oss;
+        if (coefficient == 0) return "";
+        if (degree == 0) oss << coefficient;
+        else if (degree == 1) oss << coefficient << "x";
+        else oss << coefficient << "x^" << degree;
+        return oss.str();
+    }
+};
+
+class Polynomial 
+{
+private:
+    std::vector<Monomial> monomials;
+
+    void simplify() 
+    {
+        std::sort(monomials.begin(), monomials.end(), [](const Monomial& a, const Monomial& b) 
+        {
+            return a.degree > b.degree;
+            });
+
+        std::vector<Monomial> simplified;
+        for (const auto& m : monomials) 
+        {
+            if (!simplified.empty() && simplified.back().degree == m.degree) 
+            {
+                simplified.back().coefficient += m.coefficient;
+            }
+            else 
+            {
+                simplified.push_back(m);
+            }
+        }
+
+        monomials = simplified;
+    }
+
+public:
+    Polynomial(const std::vector<Monomial>& mons) : monomials(mons) 
+    {
+        simplify();
+    }
+
+    Polynomial operator+(const Polynomial& other) const 
+    {
+        std::vector<Monomial> result = monomials;
+        result.insert(result.end(), other.monomials.begin(), other.monomials.end());
+        return Polynomial(result);
+    }
+
+    Polynomial operator-(const Polynomial& other) const 
+    {
+        std::vector<Monomial> result = monomials;
+        for (const auto& m : other.monomials) 
+        {
+            result.push_back(Monomial(-m.coefficient, m.degree));
+        }
+        return Polynomial(result);
+    }
+
+    Polynomial operator*(const Polynomial& other) const 
+    {
+        std::vector<Monomial> result;
+        for (const auto& m1 : monomials) 
+        {
+            for (const auto& m2 : other.monomials) 
+            {
+                result.push_back(Monomial(m1.coefficient * m2.coefficient, m1.degree + m2.degree));
+            }
+        }
+        return Polynomial(result);
+    }
+
+    Polynomial operator/(const Polynomial& other) const 
+    {
+        if (other.monomials.empty() || (other.monomials.size() == 1 && other.monomials[0].coefficient == 0)) 
+        {
+            throw std::invalid_argument("Cannot divide by a zero polynomial.");
+        }
+
+        std::vector<Monomial> dividend = monomials;
+        std::vector<Monomial> divisor = other.monomials;
+        std::vector<Monomial> result;
+
+        while (!dividend.empty() && dividend.front().degree >= divisor.front().degree) 
+        {
+            Monomial leadDividend = dividend.front();
+            Monomial leadDivisor = divisor.front();
+            Monomial quotientMonomial(leadDividend.coefficient / leadDivisor.coefficient, leadDividend.degree - leadDivisor.degree);
+
+            result.push_back(quotientMonomial);
+
+            Polynomial subtrahend({ quotientMonomial });
+            subtrahend = subtrahend * Polynomial(divisor);
+
+            Polynomial newDividend(dividend);
+            newDividend = newDividend - subtrahend;
+            dividend = newDividend.monomials;
+        }
+
+        return Polynomial(result);
+    }
+
+    Polynomial operator<<(int shift) const 
+    {
+        std::vector<Monomial> result;
+        for (const auto& m : monomials) 
+        {
+            result.push_back(Monomial(m.coefficient, m.degree + shift));
+        }
+        return Polynomial(result);
+    }
+
+    std::string toString() const 
+    {
+        if (monomials.empty()) return "0";
+
+        std::ostringstream oss;
+        for (const auto& monomial : monomials) 
+        {
+            if (oss.tellp() > 0 && monomial.coefficient > 0) 
+            {
+                oss << "+";
+            }
+            oss << monomial.toString();
+        }
+        return oss.str();
+    }
+};
+
+Polynomial createPolynomialFromUserInput() 
+{
+    std::vector<Monomial> monomials;
+    std::cout << "Введите количество одночленов в многочлене: ";
+    int n;
+    std::cin >> n;
+for (int i = 0; i < n; ++i) 
+    {
+        std::cout << "Введите коэффициент и показатель степени для одночлена " << i + 1 << " (например, 3 2 для 3x^2): ";
+        double coefficient;
+        int degree;
+        std::cin >> coefficient >> degree;
+        monomials.push_back(Monomial(coefficient, degree));
+    }
+    return Polynomial(monomials);
+}
+
+int main() 
+{
+    setlocale(LC_ALL, "ru");
+    std::cout << "Создайте первый многочлен:\n";
+    Polynomial p1 = createPolynomialFromUserInput();
+
+    std::cout << "\nСоздайте второй многочлен:\n";
+    Polynomial p2 = createPolynomialFromUserInput();
+
+    Polynomial sum = p1 + p2;
+    Polynomial difference = p1 - p2;
+    Polynomial product = p1 * p2;
+    Polynomial quotient = p1 / p2;
+    Polynomial shifted = p1 << 2;
+
+    std::cout << "\np1: " << p1.toString() << std::endl;
+    std::cout << "p2: " << p2.toString() << std::endl;
+    std::cout << "p1 + p2: " << sum.toString() << std::endl;
+    std::cout << "p1 - p2: " << difference.toString() << std::endl;
+    std::cout << "p1 * p2: " << product.toString() << std::endl;
+    std::cout << "p1 / p2: " << quotient.toString() << std::endl;
+    std::cout << "p1 << 2: " << shifted.toString() << std::endl;
+
+    return 0;
+}
